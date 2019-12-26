@@ -1,6 +1,7 @@
 # strona zewnętrzna sądu
 #www.lezajsk.sr.gov.pl
-google.com
-onet.pl
-gmail.com
+#google.com
+#onet.pl
+#gmail.com
 facebook.com
+10.80.70.1
