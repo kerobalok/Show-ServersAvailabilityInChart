@@ -1,6 +1,6 @@
 
 #sprawdzanie czy mamy do czynienia ze zmienną, tablicą, obiektem można sprawdzić poprzez $cos_do_sprawdzenia.gettype()
-# zmienic foreach ($server in $servers.PSObject.Properties) na $servers | Get-Member -MemberType NoteProperty | Select-Object -Expand Name    i zaraz potem w całym foreach zamienić zmienną $server_address na samą $server z warunku foreach
+
 <################################## -VARIABLES- #####################################>
 $interval_delay = 1 #interval in seconds between finish and start another cycle of ping measurements.
 $FormatEnumerationLimit = 10 #for debuging purposes only. This variable sets number of item displayed on the screen when object is displayed. Default is 4. This variable in production environment can be easely deleted or commented.
@@ -27,8 +27,8 @@ $servers | Add-Member -NotePropertyMembers ([ordered]@{timestamp=@()})
 do {
     
     # do ping measurements for every server
-    foreach ($server in $servers.PSObject.Properties) {    
-        $server_address = $server.Name # to jest problem bo pobiera każdy obiekt typu name i wyknuje na nim dalsze działania
+    foreach ($server_address in $servers.PSObject.Properties.Name) {    
+        #$server_address = $server.Name # to jest problem bo pobiera każdy obiekt typu name i wyknuje na nim dalsze działania
         
         if ($servers.$server_address.length -eq $number_measurements){
             Write-Debug "usuwanie nadmiarowych elementow z tabicy"
