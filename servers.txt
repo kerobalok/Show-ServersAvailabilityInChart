@@ -2,7 +2,6 @@
 #www.lezajsk.sr.gov.pl
 #google.com
 #onet.pl
-#gmail.com
+gmail.com
 facebook.com
-10.80.70.1
-10.80.70.119
+10.0.5.1
