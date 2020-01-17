@@ -1,101 +1,135 @@
-# Inspired by script from https://www.powershellbros.com/building-first-chart-report-powershell/
+#sprawdzanie czy mamy do czynienia ze zmienną, tablicą, obiektem można sprawdzić poprzez $cos_do_sprawdzenia.gettype()
+
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+#region ENTRY REQUIREMENTS (open region Ctrl+K Ctrl+8, close Ctrl+K Ctrl+8)
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+################################# -PARAMETERS - ####################################
+# Below are parameters with which script can be run. If script will be run without them, it will use they default values.
+param(
+    [ValidateRange(1,600)][int]$interval_delay = 1,
+    [ValidateRange(2,100)][int]$number_measurements = 4
+)
+####################################################################################
+
+################################## -VARIABLES- #####################################
+$FormatEnumerationLimit = 10 #for debuging purposes only. This variable sets number of item displayed on the screen when object is displayed. Default is 4. This variable in production environment can be easely deleted or commented.
+####################################################################################
+
+########################## - TYPES NEEDED TO MAKE CHART - ##########################
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Windows.Forms.DataVisualization
+####################################################################################
+
+################################## - FUNCTIONS - ###################################
+function script:New-Chart {
+    param ([PSCustomObject]$servers)
+
+    $Chart = New-object System.Windows.Forms.DataVisualization.Charting.Chart
+    $ChartArea = New-Object System.Windows.Forms.DataVisualization.Charting.ChartArea
+    $Series = New-Object -TypeName System.Windows.Forms.DataVisualization.Charting.Series
+    $Series2 = New-Object -TypeName System.Windows.Forms.DataVisualization.Charting.Series
+    $Series3 = New-Object -TypeName System.Windows.Forms.DataVisualization.Charting.Series
+    $ChartTypes = [System.Windows.Forms.DataVisualization.Charting.SeriesChartType]
+
+    $Series.ChartType = $ChartTypes::Line
+    $Series2.ChartType = $ChartTypes::Line
+    $Series3.ChartType = $ChartTypes::Line
+
+    $Chart.Series.Add($Series)
+    $Chart.Series.Add($Series2)
+    $Chart.Series.Add($Series3)
+    $Chart.ChartAreas.Add($ChartArea)
+
+    $Chart.Series['Series1'].Points.DataBindXY($servers.timestamp, $servers."facebook.com")
+    $Chart.Series['Series2'].Points.DataBindXY($servers.timestamp, $servers."gmail.com")
+    $Chart.Series['Series3'].Points.DataBindXY($servers.timestamp, $servers."10.0.5.1")
+
+    $Chart.Width = 700
+    $Chart.Height = 400
+    $Chart.Left = 10
+    $Chart.Top = 10
+    $Chart.BackColor = [System.Drawing.Color]::White
+    $Chart.BorderColor = 'Black'
+    $Chart.BorderDashStyle = 'Solid'
+
+    $ChartTitle = New-Object System.Windows.Forms.DataVisualization.Charting.Title
+    $ChartTitle.Text = 'Servers Availability'
+    $Font = New-Object System.Drawing.Font @('Microsoft Sans Serif','12', [System.Drawing.FontStyle]::Bold)
+    $ChartTitle.Font =$Font
+    $Chart.Titles.Add($ChartTitle)
+
+    $Legend = New-Object System.Windows.Forms.DataVisualization.Charting.Legend
+    $Legend.IsEquallySpacedItems = $True
+    $Legend.BorderColor = 'Black'
+    $Chart.Legends.Add($Legend)
+    $chart.Series["Series1"].LegendText = $servers.PSObject.Properties | Where-Object -property Name -eq "facebook.com" | Select-Object -ExpandProperty Name
+    $chart.Series["Series2"].LegendText = $servers.PSObject.Properties | Where-Object -property Name -eq "gmail.com" | Select-Object -ExpandProperty Name
+    $chart.Series["Series3"].LegendText = $servers.PSObject.Properties | Where-Object -property Name -eq "10.0.5.1" | Select-Object -ExpandProperty Name
+
+    $Chart.SaveImage($PSScriptRoot + "\wykres.png", "PNG")
+}
+####################################################################################
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+#endregion ENTRY REQUIREMENTS
+#-------------------------------------------------------------------------------------------------------------------------------------------------
 
 
-# reading list of servers from file
-$servers = (Get-Content "$PSScriptRoot\servers.txt") -notmatch '^#' 
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+#region MAIN CODE (open region Ctrl+K Ctrl+8, close Ctrl+K Ctrl+8)
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+# reading servers from file
+$file_content = (Get-Content "$PSScriptRoot\servers.txt") -notmatch '^#' 
 
-[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms')
-[void][Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms.DataVisualization')
+# create empty master object to store servers name with ping results
+$servers = New-Object  PSObject -Property ([ordered]@{})
 
-$Chart = New-Object -TypeName System.Windows.Forms.DataVisualization.Charting.Chart
-$Chart.Size = '960,600'
-
-$ChartArea = New-Object -TypeName System.Windows.Forms.DataVisualization.Charting.ChartArea
-$ChartArea.AxisX.Title = 'Time'
-$ChartArea.AxisY.Title = 'Miliseconds'
-$ChartArea.AxisX.Interval = '1'
-$ChartArea.AxisX.LabelStyle.Enabled = $true
-$ChartArea.AxisX.LabelStyle.Angle = 90
-$Chart.ChartAreas.Add($ChartArea) #ta część dodaje obszar wykresu
-
-$Legend = New-Object System.Windows.Forms.DataVisualization.Charting.Legend
-$Legend.IsEquallySpacedItems = $True
-$Legend.BorderColor = 'Black'
-$Chart.Legends.Add($Legend)
-$chart.Series["Series1"].LegendText = "#VALX (#VALY)"
-
-
-# $Chart.Series.Add('ping_response') #ta dodaje serię - chyba tym się mam bawić
-# $Chart.Series['ping_response'].ChartType = [System.Windows.Forms.DataVisualization.Charting.SeriesChartType]::Line
-
-foreach ($server in $servers) {
-    $Chart.Series.Add($server) #ta dodaje serię - chyba tym się mam bawić
-    $Chart.Series[$server].ChartType = [System.Windows.Forms.DataVisualization.Charting.SeriesChartType]::Line
-
-    $Chart.Legends.Add($server)
-    $chart.Series[$server].LegendText = "$server"
+# creating subobjects storing servers names
+$file_content | ForEach-Object {
+    $server = $_
+    if( ($servers.PSObject.Properties | Select-Object -Expand Name) -match $server){
+        write-host "istnieje" $server
+    }
+    else {
+        $servers | Add-Member -NotePropertyMembers ([ordered]@{$server=@()})
+    }  
 }
 
+# creating subobject storing timestamp
+$servers | Add-Member -NotePropertyMembers ([ordered]@{timestamp=@()})
 
-# creating empty object for measuring servers ping response
-#$server = New-Object -TypeName psobject
+# loop "do while" doing measurements
+do {
+    # do ping measurements for every server from $servers object
+    foreach ($server in $servers.PSObject.Properties.Name) {
+        # checking number of measurements stored under servers subobjects and delete unnesesary results (results that exceed $number_measurements)    
+        if ($servers.$server.length -eq $number_measurements){
+            Write-Debug "usuwanie nadmiarowych elementow z tabicy"
+            $servers.$server = $servers.$server[1..$number_measurements]
+        }
 
-#  PINGING EVERY SERVER FROM $servers ARRAY AND RESULT STORE TO OBJECT $server WHICH AS A ASSOCIATIVE ARRAY @{$server = @($ping)}
-#   - $server - property with name of server  
-#   - $ping - array to store ping results
-foreach ($server in $servers) {
-    Write-Host "Processing $Server" -ForegroundColor Green
-    $ping = Get-CimInstance -Query "select * from win32_pingstatus where Address='$server'" | select-object -Expandproperty ResponseTime
-    #$parameters = @{$server = @($ping)} 
-    $_ = $ping
+        # doing ping measurements for every server address stored in $server subobject excluding subobject named "timestamp"
+        if ($server -notmatch "timestamp"){
+            [int]$ping = 0
+            $ping = Get-CimInstance -Query "select * from win32_pingstatus where Address='$server'" | select-object -Expandproperty ResponseTime
+            
+            # if server not respondig to ping, replace null value with 0
+            if ($NULL -eq $ping){
+                $ping = -1
+            }
+            
+            #add ping result to array stored under $server subobject, for example facebook.com@{10,11, itd.}
+            $servers.$server += $ping
+        }
+    }
 
-    write-host $ping
-
-
+    [datetime]$timestamp = Get-Date
+    $servers.timestamp += $timestamp
     
+    $servers | Format-Table -AutoSize 
+    New-Chart $servers
+    Start-Sleep -Seconds $interval_delay
 
-
-
-    # $server | Add-Member -NotePropertyMembers $parameters
-
-
-# # PINGING EVERY CREATED OBJECTS NUMBER OF TIMES
-#     for ($i=0; $i -le 5; $i++) {
-#     # loop for making ping test and add results to property $server.ping
-#         #$server.PSObject.Properties | foreach-object {
-#         ForEach ($server in $servers){
-#             Write-Host "Pinging $server" -ForegroundColor Green
-#             $ping_response = Get-CimInstance -Query "select * from win32_pingstatus where Address='$server'" | select-object -Expandproperty ResponseTime
-#             if($ping_response){
-#                 $_.Value += $Chart.Series[$server].Points.AddXY( (Get-Date -Format "HH:mm:ss"),"$ping_response")
-#             }
-#             #$_.Value += Get-CimInstance -Query "select * from win32_pingstatus where Address='$server'" | select-object -Expandproperty ResponseTime   
-#         }
-#     }
-}
-
-write-host {google.com}
-# write-host $servers | Select-Object *
-
-
-
-
-# $Title = New-Object -TypeName System.Windows.Forms.DataVisualization.Charting.Title
-# $Chart.Titles.Add($Title)
-# $Chart.Titles[0].Text = 'Servers Availability in Chart'
-
-
-# $Chart.SaveImage($PSScriptRoot + "\Chart.png", "PNG")
-
-
-
-
-
-
-
-############################################################################################################################################
-# Chart Types 
-#   - https://docs.microsoft.com/en-us/previous-versions/dd489233(v=vs.140)?redirectedfrom=MSDN
-#   - https://docs.microsoft.com/en-us/dotnet/api/system.windows.forms.datavisualization.charting.seriescharttype?redirectedfrom=MSDN&view=netframework-4.8
-# wyświetla wszystkie właściwości objectu $server.PSObject.Properties
-# wyświetlenie konkretnej właściwości objectu #Write-Output $server | select-Object -property "google.com", "onet.pl"
+} while (1 -lt 2) # by regulating this condition you can set if ping measurements should be done forever or by regulated time. For forever measurements you can use condition (1 -lt 2)
+#-------------------------------------------------------------------------------------------------------------------------------------------------
+#endregion MAIN CODE
+#-------------------------------------------------------------------------------------------------------------------------------------------------
